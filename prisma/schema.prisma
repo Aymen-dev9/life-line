@@ -1,0 +1,644 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+enum RelationshipType {
+  SELF
+  MOTHER
+  FATHER
+  CHILD
+  SPOUSE
+  DEPENDENT
+  OTHER
+}
+
+enum ProviderGender {
+  FEMALE
+  MALE
+}
+
+enum ProviderProfession {
+  NURSE
+  DOCTOR
+  PHLEBOTOMIST
+  LAB_TECHNICIAN
+  PHARMACIST
+  OTHER
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  SUSPENDED
+  EXPIRED
+}
+
+enum OperationalState {
+  AVAILABLE
+  BUSY
+  ON_VISIT
+  OFFLINE
+}
+
+enum CaseStatus {
+  OPEN
+  ACTIVE
+  FOLLOW_UP
+  RESOLVED
+  CLOSED
+  CANCELLED
+}
+
+enum RequestStatus {
+  DRAFT
+  SUBMITTED
+  PENDING_REVIEW
+  PENDING_ASSIGNMENT
+  ASSIGNED
+  PROVIDER_ACCEPTED
+  CONFIRMED
+  PROVIDER_ON_THE_WAY
+  ARRIVED
+  IN_PROGRESS
+  COMPLETED
+  FOLLOW_UP_REQUIRED
+  CANCELLED
+  NO_SHOW
+  REJECTED
+}
+
+enum GenderPreference {
+  FEMALE
+  MALE
+  NO_PREFERENCE
+}
+
+enum ScheduleType {
+  ASAP
+  SCHEDULED
+  RECURRING
+}
+
+enum AppointmentStatus {
+  PLANNED
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum AssignmentStatus {
+  OFFERED
+  ASSIGNED
+  ACCEPTED
+  DECLINED
+  RELEASED
+  COMPLETED
+}
+
+enum EncounterStatus {
+  PLANNED
+  ARRIVED
+  IN_PROGRESS
+  COMPLETED
+  AMENDED
+  CANCELLED
+}
+
+enum ClinicalDocumentStatus {
+  DRAFT
+  FINALIZED
+  CORRECTED
+  AMENDED
+  SUPERSEDED
+}
+
+enum FollowUpStatus {
+  PENDING
+  SCHEDULED
+  COMPLETED
+  MISSED
+  CANCELLED
+  OVERDUE
+}
+
+enum NotificationChannel {
+  IN_APP
+  PUSH
+  WHATSAPP
+  SMS
+  EMAIL
+}
+
+enum DeliveryStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  FAILED
+  READ
+  ACKNOWLEDGED
+  SIMULATED
+}
+
+model UserAccount {
+  id            String        @id @default(uuid()) @db.Uuid
+  publicId      String        @unique
+  phoneE164     String        @unique
+  email         String?       @unique
+  preferredLang String        @default("ar") @db.VarChar(5)
+  status        AccountStatus @default(ACTIVE)
+  createdAt     DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime      @updatedAt @db.Timestamptz(6)
+  relationships PatientRelationship[]
+  permissions   PatientAccessPermission[]
+  addresses     SavedAddress[]
+  roleGrants    AccountRoleGrant[]
+  notifications Notification[]
+  ratings       Rating[]
+}
+
+model Patient {
+  id             String       @id @default(uuid()) @db.Uuid
+  publicId       String       @unique
+  fullNameAr     String
+  fullNameEn     String?
+  dateOfBirth    DateTime?    @db.Date
+  estimatedAge   Int?
+  clinicalSex    String?      @db.VarChar(20)
+  phoneE164      String?
+  preferredLang String       @default("ar") @db.VarChar(5)
+  createdAt      DateTime     @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime     @updatedAt @db.Timestamptz(6)
+  relationships PatientRelationship[]
+  permissions    PatientAccessPermission[]
+  addresses      SavedAddress[]
+  cases          MedicalCase[]
+  requests       ServiceRequest[]
+  encounters     Encounter[]
+}
+
+model PatientRelationship {
+  id           String           @id @default(uuid()) @db.Uuid
+  accountId    String           @db.Uuid
+  patientId    String           @db.Uuid
+  relationship RelationshipType
+  isPrimary    Boolean          @default(false)
+  active       Boolean          @default(true)
+  createdAt    DateTime         @default(now()) @db.Timestamptz(6)
+  account      UserAccount      @relation(fields: [accountId], references: [id])
+  patient      Patient          @relation(fields: [patientId], references: [id])
+  @@unique([accountId, patientId])
+  @@index([patientId, active])
+}
+
+model PatientAccessPermission {
+  id         String      @id @default(uuid()) @db.Uuid
+  accountId  String      @db.Uuid
+  patientId  String      @db.Uuid
+  scope      String
+  grantedBy  String?
+  validUntil DateTime?   @db.Timestamptz(6)
+  revokedAt  DateTime?   @db.Timestamptz(6)
+  createdAt  DateTime    @default(now()) @db.Timestamptz(6)
+  account    UserAccount @relation(fields: [accountId], references: [id])
+  patient    Patient     @relation(fields: [patientId], references: [id])
+  @@unique([accountId, patientId, scope])
+}
+
+model Role {
+  id          String             @id @default(uuid()) @db.Uuid
+  code        String             @unique
+  name        String
+  grants      AccountRoleGrant[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id    String             @id @default(uuid()) @db.Uuid
+  code  String             @unique
+  roles RolePermission[]
+}
+
+model AccountRoleGrant {
+  accountId String      @db.Uuid
+  roleId    String      @db.Uuid
+  grantedAt DateTime    @default(now()) @db.Timestamptz(6)
+  account   UserAccount @relation(fields: [accountId], references: [id])
+  role      Role        @relation(fields: [roleId], references: [id])
+  @@id([accountId, roleId])
+}
+
+model RolePermission {
+  roleId       String     @db.Uuid
+  permissionId String     @db.Uuid
+  role         Role       @relation(fields: [roleId], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id])
+  @@id([roleId, permissionId])
+}
+
+model SavedAddress {
+  id           String      @id @default(uuid()) @db.Uuid
+  publicId     String      @unique
+  accountId    String      @db.Uuid
+  patientId    String?     @db.Uuid
+  labelAr      String
+  labelEn      String
+  countryCode  String      @default("IQ") @db.VarChar(2)
+  governorate  String?
+  city         String
+  district     String
+  street       String?
+  building     String?
+  floor        String?
+  landmark     String
+  accessNote   String?
+  contactName  String?
+  contactPhone String?
+  latitude     Decimal     @db.Decimal(9, 6)
+  longitude    Decimal     @db.Decimal(9, 6)
+  accuracyM    Decimal?    @db.Decimal(8, 2)
+  zoneId       String
+  isDefault    Boolean     @default(false)
+  createdAt    DateTime    @default(now()) @db.Timestamptz(6)
+  account      UserAccount @relation(fields: [accountId], references: [id])
+  patient      Patient?    @relation(fields: [patientId], references: [id])
+  requests     ServiceRequest[]
+  @@index([accountId, isDefault])
+}
+
+model ServiceCategory {
+  id        String    @id @default(uuid()) @db.Uuid
+  code      String    @unique
+  nameAr    String
+  nameEn    String
+  sortOrder Int       @default(0)
+  enabled   Boolean   @default(true)
+  services  Service[]
+}
+
+model Service {
+  id                       String             @id @default(uuid()) @db.Uuid
+  publicId                 String             @unique
+  slug                     String             @unique
+  categoryId               String             @db.Uuid
+  nameAr                   String
+  nameEn                   String
+  descriptionAr            String
+  descriptionEn            String
+  estimatedDurationMinutes Int
+  basePriceMinor           BigInt
+  currency                 String             @db.VarChar(3)
+  requiredProfession       ProviderProfession
+  supportsGenderPreference Boolean            @default(false)
+  requiresLocation         Boolean            @default(true)
+  supportsRecurrence       Boolean            @default(false)
+  enabled                  Boolean            @default(true)
+  schemaVersion            Int                @default(1)
+  category                 ServiceCategory    @relation(fields: [categoryId], references: [id])
+  questions                ServiceQuestion[]
+  requiredSkills           ServiceRequiredSkill[]
+  requests                 ServiceRequest[]
+}
+
+model ServiceQuestion {
+  id            String    @id @default(uuid()) @db.Uuid
+  serviceId     String    @db.Uuid
+  questionKey   String
+  type          String
+  labelAr       String
+  labelEn       String
+  required      Boolean   @default(false)
+  safetyType    String?
+  options       Json?
+  condition     Json?
+  validation    Json?
+  sortOrder     Int
+  active        Boolean   @default(true)
+  service       Service   @relation(fields: [serviceId], references: [id])
+  answers       IntakeAnswer[]
+  @@unique([serviceId, questionKey])
+}
+
+model ProviderProfile {
+  id                 String             @id @default(uuid()) @db.Uuid
+  publicId           String             @unique
+  accountId          String?            @unique @db.Uuid
+  fullNameAr         String
+  fullNameEn         String
+  gender             ProviderGender
+  profession         ProviderProfession
+  specialization     String?
+  licenseNumber      String?
+  licenseExpiresAt   DateTime?          @db.Date
+  yearsExperience    Int?
+  languages          String[]
+  verificationStatus VerificationStatus @default(PENDING)
+  operationalState   OperationalState   @default(OFFLINE)
+  rating             Decimal            @default(0) @db.Decimal(3, 2)
+  createdAt          DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime           @updatedAt @db.Timestamptz(6)
+  skills             ProviderSkillGrant[]
+  credentials        ProviderCredential[]
+  assignments        Assignment[]
+  encounters         Encounter[]
+}
+
+model ProviderSkill {
+  id        String               @id @default(uuid()) @db.Uuid
+  code      String               @unique
+  nameAr    String
+  nameEn    String
+  providers ProviderSkillGrant[]
+  services  ServiceRequiredSkill[]
+}
+
+model ProviderSkillGrant {
+  providerId String          @db.Uuid
+  skillId    String          @db.Uuid
+  verifiedAt DateTime?       @db.Timestamptz(6)
+  expiresAt  DateTime?       @db.Date
+  provider   ProviderProfile @relation(fields: [providerId], references: [id])
+  skill      ProviderSkill   @relation(fields: [skillId], references: [id])
+  @@id([providerId, skillId])
+}
+
+model ServiceRequiredSkill {
+  serviceId String        @db.Uuid
+  skillId   String        @db.Uuid
+  service   Service       @relation(fields: [serviceId], references: [id])
+  skill     ProviderSkill @relation(fields: [skillId], references: [id])
+  @@id([serviceId, skillId])
+}
+
+model ProviderCredential {
+  id           String             @id @default(uuid()) @db.Uuid
+  providerId   String             @db.Uuid
+  type         String
+  reference    String
+  issuedAt     DateTime?          @db.Date
+  expiresAt    DateTime?          @db.Date
+  status       VerificationStatus @default(PENDING)
+  verifiedAt   DateTime?          @db.Timestamptz(6)
+  provider     ProviderProfile    @relation(fields: [providerId], references: [id])
+  @@index([expiresAt, status])
+}
+
+model MedicalCase {
+  id          String        @id @default(uuid()) @db.Uuid
+  publicId    String        @unique
+  reference   String        @unique
+  patientId   String        @db.Uuid
+  titleAr     String
+  titleEn     String
+  category    String
+  priority    String        @default("ROUTINE")
+  status      CaseStatus    @default(OPEN)
+  openedAt    DateTime      @default(now()) @db.Timestamptz(6)
+  closedAt    DateTime?     @db.Timestamptz(6)
+  patient     Patient       @relation(fields: [patientId], references: [id])
+  requests    ServiceRequest[]
+  encounters  Encounter[]
+  followUps   FollowUp[]
+  @@index([patientId, openedAt(sort: Desc)])
+}
+
+model ServiceRequest {
+  id                 String           @id @default(uuid()) @db.Uuid
+  publicId           String           @unique
+  reference          String           @unique
+  caseId             String           @db.Uuid
+  patientId          String           @db.Uuid
+  serviceId          String           @db.Uuid
+  addressId          String           @db.Uuid
+  schemaVersion      Int
+  status             RequestStatus    @default(SUBMITTED)
+  genderPreference   GenderPreference @default(NO_PREFERENCE)
+  scheduleType       ScheduleType
+  scheduledStartUtc  DateTime?        @db.Timestamptz(6)
+  scheduledEndUtc    DateTime?        @db.Timestamptz(6)
+  scheduleTimezone   String           @default("Asia/Baghdad")
+  submittedAt        DateTime         @default(now()) @db.Timestamptz(6)
+  createdByAccountId String           @db.Uuid
+  case               MedicalCase      @relation(fields: [caseId], references: [id])
+  patient            Patient          @relation(fields: [patientId], references: [id])
+  service            Service          @relation(fields: [serviceId], references: [id])
+  address            SavedAddress     @relation(fields: [addressId], references: [id])
+  answers            IntakeAnswer[]
+  appointment        Appointment?
+  statusHistory      RequestStatusHistory[]
+  @@index([status, scheduledStartUtc])
+  @@index([patientId, submittedAt(sort: Desc)])
+}
+
+model IntakeAnswer {
+  id         String          @id @default(uuid()) @db.Uuid
+  requestId  String          @db.Uuid
+  questionId String          @db.Uuid
+  value      Json
+  createdAt  DateTime        @default(now()) @db.Timestamptz(6)
+  request    ServiceRequest  @relation(fields: [requestId], references: [id])
+  question   ServiceQuestion @relation(fields: [questionId], references: [id])
+  @@unique([requestId, questionId])
+}
+
+model RequestStatusHistory {
+  id         String         @id @default(uuid()) @db.Uuid
+  requestId  String         @db.Uuid
+  fromStatus RequestStatus?
+  toStatus   RequestStatus
+  actorId    String
+  reason     String?
+  occurredAt DateTime       @default(now()) @db.Timestamptz(6)
+  request    ServiceRequest @relation(fields: [requestId], references: [id])
+  @@index([requestId, occurredAt])
+}
+
+model Appointment {
+  id               String            @id @default(uuid()) @db.Uuid
+  publicId         String            @unique
+  requestId        String            @unique @db.Uuid
+  status           AppointmentStatus @default(PLANNED)
+  scheduledStartUtc DateTime?        @db.Timestamptz(6)
+  scheduledEndUtc  DateTime?         @db.Timestamptz(6)
+  timezone         String
+  request          ServiceRequest    @relation(fields: [requestId], references: [id])
+  assignments      Assignment[]
+  encounter        Encounter?
+}
+
+model Assignment {
+  id            String           @id @default(uuid()) @db.Uuid
+  appointmentId String           @db.Uuid
+  providerId    String           @db.Uuid
+  status        AssignmentStatus @default(ASSIGNED)
+  explanation   Json
+  assignedBy    String
+  assignedAt    DateTime         @default(now()) @db.Timestamptz(6)
+  acceptedAt    DateTime?        @db.Timestamptz(6)
+  releasedAt    DateTime?        @db.Timestamptz(6)
+  appointment   Appointment      @relation(fields: [appointmentId], references: [id])
+  provider      ProviderProfile  @relation(fields: [providerId], references: [id])
+  @@index([providerId, status, assignedAt])
+}
+
+model Encounter {
+  id               String         @id @default(uuid()) @db.Uuid
+  publicId         String         @unique
+  appointmentId    String         @unique @db.Uuid
+  caseId           String         @db.Uuid
+  patientId        String         @db.Uuid
+  providerId       String         @db.Uuid
+  status           EncounterStatus @default(PLANNED)
+  startedAt        DateTime?      @db.Timestamptz(6)
+  endedAt          DateTime?      @db.Timestamptz(6)
+  locationSnapshot Json?
+  createdAt        DateTime       @default(now()) @db.Timestamptz(6)
+  appointment      Appointment    @relation(fields: [appointmentId], references: [id])
+  case             MedicalCase    @relation(fields: [caseId], references: [id])
+  patient          Patient        @relation(fields: [patientId], references: [id])
+  provider         ProviderProfile @relation(fields: [providerId], references: [id])
+  vitals           VitalSign[]
+  notes            ClinicalNote[]
+}
+
+model VitalSign {
+  id           String    @id @default(uuid()) @db.Uuid
+  encounterId  String    @db.Uuid
+  code         String
+  value        Decimal   @db.Decimal(10, 3)
+  unit         String
+  measuredAt   DateTime  @db.Timestamptz(6)
+  performerId  String
+  source       String?
+  encounter    Encounter @relation(fields: [encounterId], references: [id])
+  @@index([encounterId, measuredAt])
+}
+
+model ClinicalNote {
+  id           String                 @id @default(uuid()) @db.Uuid
+  encounterId  String                 @db.Uuid
+  version      Int                    @default(1)
+  status       ClinicalDocumentStatus @default(DRAFT)
+  content      Json
+  authoredBy   String
+  authoredAt   DateTime               @default(now()) @db.Timestamptz(6)
+  supersedesId String?                @db.Uuid
+  reason       String?
+  encounter    Encounter              @relation(fields: [encounterId], references: [id])
+  supersedes   ClinicalNote?          @relation("NoteVersions", fields: [supersedesId], references: [id])
+  amendments   ClinicalNote[]         @relation("NoteVersions")
+  @@unique([encounterId, version])
+}
+
+model FollowUp {
+  id              String         @id @default(uuid()) @db.Uuid
+  publicId        String         @unique
+  caseId          String         @db.Uuid
+  type            String
+  reason          String
+  dueAt           DateTime       @db.Timestamptz(6)
+  timezone        String
+  responsibleRole String
+  providerId      String?        @db.Uuid
+  status          FollowUpStatus @default(PENDING)
+  reminderPolicy  Json
+  case            MedicalCase    @relation(fields: [caseId], references: [id])
+  @@index([status, dueAt])
+}
+
+model Notification {
+  id          String             @id @default(uuid()) @db.Uuid
+  publicId    String             @unique
+  accountId   String             @db.Uuid
+  eventType   String
+  privacyLevel String            @default("MINIMAL")
+  titleAr     String
+  titleEn     String
+  bodyAr      String
+  bodyEn      String
+  deepLink    String?
+  createdAt   DateTime           @default(now()) @db.Timestamptz(6)
+  readAt      DateTime?          @db.Timestamptz(6)
+  account     UserAccount        @relation(fields: [accountId], references: [id])
+  deliveries  NotificationDelivery[]
+  @@index([accountId, createdAt(sort: Desc)])
+}
+
+model NotificationDelivery {
+  id                String              @id @default(uuid()) @db.Uuid
+  notificationId    String              @db.Uuid
+  channel           NotificationChannel
+  status            DeliveryStatus      @default(QUEUED)
+  idempotencyKey    String              @unique
+  providerMessageId String?
+  attemptCount      Int                 @default(0)
+  scheduledAt       DateTime            @db.Timestamptz(6)
+  lastAttemptAt     DateTime?           @db.Timestamptz(6)
+  failureCode       String?
+  notification      Notification        @relation(fields: [notificationId], references: [id])
+  @@index([status, scheduledAt])
+}
+
+model Rating {
+  id        String      @id @default(uuid()) @db.Uuid
+  accountId String      @db.Uuid
+  requestId String      @unique @db.Uuid
+  overall   Int
+  comment   String?
+  createdAt DateTime    @default(now()) @db.Timestamptz(6)
+  account   UserAccount @relation(fields: [accountId], references: [id])
+  @@index([createdAt])
+}
+
+model DomainEventOutbox {
+  id            String   @id @default(uuid()) @db.Uuid
+  aggregateType String
+  aggregateId   String
+  eventType     String
+  payload       Json
+  occurredAt    DateTime @default(now()) @db.Timestamptz(6)
+  publishedAt   DateTime? @db.Timestamptz(6)
+  attemptCount  Int      @default(0)
+  @@index([publishedAt, occurredAt])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  actorId     String
+  effectiveRole String
+  action      String
+  entityType  String
+  entityId    String
+  requestId   String?
+  sessionId   String?
+  reason      String?
+  changeMeta  Json?
+  occurredAt  DateTime @default(now()) @db.Timestamptz(6)
+  @@index([entityType, entityId, occurredAt])
+  @@index([actorId, occurredAt])
+}
+
+model IdempotencyRecord {
+  key          String   @id
+  actorId      String
+  operation    String
+  requestHash  String
+  responseCode Int
+  responseBody Json
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  expiresAt    DateTime @db.Timestamptz(6)
+  @@index([expiresAt])
+}

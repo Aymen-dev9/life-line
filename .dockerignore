@@ -1,0 +1,10 @@
+.git
+.next
+node_modules
+coverage
+.env
+.env.local
+*.log
+fitness_app.html
+index.html
+

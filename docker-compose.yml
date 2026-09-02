@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: care
+      POSTGRES_PASSWORD: care
+      POSTGRES_DB: care_platform
+    ports: ["5432:5432"]
+    volumes: ["care-postgres:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U care -d care_platform"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  redis:
+    image: redis:8-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports: ["6379:6379"]
+    volumes: ["care-redis:/data"]
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: care-local
+      MINIO_ROOT_PASSWORD: care-local-change-me
+    ports: ["9000:9000", "9001:9001"]
+    volumes: ["care-minio:/data"]
+
+volumes:
+  care-postgres:
+  care-redis:
+  care-minio:
+
