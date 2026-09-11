@@ -1,11 +1,10 @@
 import type { MetadataRoute } from "next";
-import { appConfig } from "@/config/app";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: appConfig.brand.nameEn,
-    short_name: appConfig.brand.nameEn,
-    description: "Home healthcare and medical case management",
+    name: "Life Line",
+    short_name: "Life Line",
+    description: "منصة الرعاية الطبية المنزلية والصيدلية",
     start_url: "/",
     display: "standalone",
     background_color: "#f5f7f6",

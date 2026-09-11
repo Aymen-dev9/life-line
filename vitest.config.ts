@@ -5,6 +5,7 @@ export default defineConfig({
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   test: {
     environment: "node",
-    coverage: { reporter: ["text", "html"], include: ["src/modules/**/*.ts"] }
-  }
+    include: ["src/**/*.test.ts"],
+    coverage: { reporter: ["text", "html"], include: ["src/care/**/*.ts"] },
+  },
 });

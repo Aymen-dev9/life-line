@@ -9,3 +9,5 @@ test-results/
 dist/
 generated/prisma/
 *.tsbuildinfo
+.care-data/
+artifacts/
