@@ -2,14 +2,13 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { CareError } from "./errors";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "../public-config";
 
 export { CareError, rpcError } from "./errors";
 
 function credentials() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) throw new CareError("AUTH_CONFIG", 503);
-  return { url, key };
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) throw new CareError("AUTH_CONFIG", 503);
+  return { url: SUPABASE_URL, key: SUPABASE_ANON_KEY };
 }
 
 // Cookie-bound client: reads/writes the Supabase session cookies. Use for anything

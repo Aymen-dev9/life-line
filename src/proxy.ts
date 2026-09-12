@@ -1,15 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/care/public-config";
 
 // Refresh the Supabase auth session on navigation so Server Components always see a
 // current token. Keep this limited to the session refresh — no app logic here.
 export default async function proxy(request: NextRequest) {
   const response = NextResponse.next({ request });
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) return response;
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return response;
 
-  const supabase = createServerClient(url, key, {
+  const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     cookies: {
       getAll: () => request.cookies.getAll(),
       setAll: (list) => {
