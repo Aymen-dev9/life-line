@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Life Line
 
 Arabic-first (RTL) home-healthcare platform for Iraq. Patients request home medical
@@ -120,3 +121,6 @@ npm run check      # lint + typecheck + test + build
 4. Deploy. The Supabase backend is shared across environments.
 
 Supabase is the backend (DB/Auth/Storage); Vercel hosts the Next.js frontend.
+=======
+# life-line
+>>>>>>> 661b6c0848ac684819493645b365c28a0ba8f558
