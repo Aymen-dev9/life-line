@@ -6,6 +6,7 @@ export const runtime = "nodejs";
 
 const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("logout") }),
+  z.object({ action: z.literal("password"), email: z.string().trim().max(254), password: z.string().min(1).max(200) }),
   z.object({
     action: z.enum(["send", "verify"]),
     channel: z.enum(["email", "whatsapp"]),
@@ -28,6 +29,20 @@ export async function POST(request: Request) {
       const supabase = await supabaseServer();
       await supabase.auth.signOut();
       return json({ ok: true });
+    }
+
+    // Email + password sign-in (fixed test accounts on the free plan). OTP stays intact.
+    if (body.action === "password") {
+      const email = z.email().parse(body.email).toLowerCase();
+      await rateLimit(`auth:password:${email}`, 10, 600);
+      await rateLimit("auth-global:password", 300, 600);
+      const supabase = await supabaseServer();
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password: body.password });
+      if (error || !data.user || !data.session) throw new CareError("CREDENTIALS", 401);
+      const { data: profile, error: syncError } = await supabase.rpc("sync_profile");
+      if (syncError) throw rpcError(syncError);
+      const role = (profile as { role?: string } | null)?.role === "admin" ? "admin" : "patient";
+      return json({ redirect: role === "admin" ? "/admin" : "/" });
     }
 
     const identifier = body.channel === "email"
