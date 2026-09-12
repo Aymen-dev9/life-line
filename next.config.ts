@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 
+// build cache bust: 2026-09-13
 const nextConfig: NextConfig = {
   agentRules: false,
   // NOTE: no `output: "standalone"` — that is only for Docker/self-hosting and breaks
