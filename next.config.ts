@@ -2,7 +2,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   agentRules: false,
-  output: "standalone",
+  // NOTE: no `output: "standalone"` — that is only for Docker/self-hosting and breaks
+  // Vercel's build packaging (missing .next/*.nft.json). Vercel handles output itself.
   poweredByHeader: false,
   reactStrictMode: true,
   async headers() {
