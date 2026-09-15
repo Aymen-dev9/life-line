@@ -1,2 +1,3 @@
-import { CarePage } from "@/care/page-server";
-export default function Page() { return <CarePage section="requests" />; }
+import { redirect } from "next/navigation";
+// Client request tracking has no login; the public flow ends at the confirmation screen.
+export default function Page() { redirect("/"); }

@@ -11,3 +11,106 @@
 .care-location-selected{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#eef6f4;border:1px solid #d3e7e2;border-radius:10px;padding:8px 12px;font-size:14px}
 .care-location-selected>span:nth-of-type(1){font-weight:600}
 @media (max-width:640px){.care-map{height:260px}}
+
+/* Public (unauthenticated) shell — reuses shared card/form/button classes; adds its own
+   base tokens plus form-control styling (the .care-app control rules do not reach here). */
+.care-public{--care-teal:#087b70;--care-ink:#193e43;--care-muted:#667e83;font-family:var(--font-arabic),sans-serif;font-size:17px;line-height:1.65;min-height:100svh;display:flex;flex-direction:column;background:#f5f8fa;color:var(--care-ink)}
+.care-public button,.care-public input,.care-public select,.care-public textarea{font-family:inherit;font-size:16px;letter-spacing:0}
+.care-public h1,.care-public h2,.care-public h3{letter-spacing:0;line-height:1.4}
+.care-public button:disabled{opacity:.55;cursor:not-allowed}
+.care-public label{display:block;font-size:15px;font-weight:500;color:#36575e}
+.care-public input:not([type=checkbox]):not([type=radio]):not([type=file]),.care-public textarea,.care-public select{width:100%;border:1px solid #cddce0;border-radius:9px;background:#fff;color:#1c444b;padding:12px 14px;min-height:48px;line-height:1.5;margin-top:7px}
+.care-public input::placeholder,.care-public textarea::placeholder{color:#8b9ca0;font-weight:400}
+.care-public textarea{resize:vertical;min-height:80px}
+.care-public input[type=checkbox],.care-public input[type=radio]{accent-color:#087b70;width:17px;height:17px;flex-shrink:0}
+.care-public-top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px clamp(18px,5vw,48px);border-bottom:1px solid #e2eaed;background:#ffffffcc;position:sticky;top:0;z-index:5;backdrop-filter:blur(8px)}
+.care-public-brand{display:flex;align-items:center;gap:12px}
+.care-public-brand>span{width:44px;height:44px;border-radius:14px;background:var(--care-teal);color:#fff;display:grid;place-items:center;flex-shrink:0}
+.care-public-brand strong{font-size:23px;line-height:1.2;display:block}
+.care-public-brand small{font-size:12px;color:var(--care-muted)}
+.care-public-admin{display:inline-flex;align-items:center;gap:8px;border:1px solid #d2e1e4;border-radius:9px;padding:9px 15px;color:#35606a;font-size:14px;font-weight:500;background:#fff}
+.care-public-admin:hover{background:#f3f8f9}
+.care-public-main{flex:1;width:100%;max-width:1000px;margin:auto;padding:clamp(28px,5vw,46px) clamp(18px,5vw,42px) 60px;animation:care-enter .3s ease-out}
+.care-public-footer{padding:18px;text-align:center;font-size:13px;color:#7e9397}
+.care-public-note{display:flex;align-items:center;gap:9px;justify-content:center;color:var(--care-muted);font-size:15px}
+.care-public-note svg{color:#6d9289;flex-shrink:0}
+.care-reference-box{display:flex;flex-direction:column;align-items:center;gap:10px;background:#eef6f4;border:1px solid #d3e7e2;border-radius:16px;padding:24px;margin:22px auto;max-width:360px}
+.care-reference-box>span:first-child{font-size:15px;color:var(--care-muted)}
+.care-reference-box strong{font-size:30px;font-family:var(--font-latin),sans-serif;letter-spacing:1px;color:#0a5a50}
+.care-public .care-status.approved{background:#eaf1fd;color:#416faa}
+.care-public .care-inline{justify-content:center}
+.care-app .care-status.approved{background:#eaf1fd;color:#416faa}
+.care-app .care-status.cancelled,.care-public .care-status.cancelled{background:#fbecea;color:#a2513f}
+@media(max-width:600px){.care-public-brand small{display:none}.care-reference-box strong{font-size:25px}}
+
+/* --- Footer (brand + dynamic-year VITAL rights) --- */
+.care-footer,.care-public-footer{display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center}
+.care-rights{font-size:12px;color:#93a6aa;font-family:var(--font-latin),sans-serif}
+.care-public .care-rights{direction:ltr}
+
+/* --- Admin header start group + mobile menu toggle (drawer) --- */
+.care-top-start{display:flex;align-items:center;gap:12px;min-width:0}
+.care-top-start>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.care-menu-toggle{display:none;border:0;background:none;color:#3a5b62;cursor:pointer;padding:6px;border-radius:8px}
+.care-menu-toggle:hover{background:#eef4f4}
+.care-sidebar-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.care-drawer-close{display:none;border:0;background:none;color:#5a7379;cursor:pointer;padding:6px}
+.care-scrim{position:fixed;inset:0;background:#0a232870;z-index:39;animation:care-enter .2s ease-out}
+
+/* --- Overflow safety: page never scrolls sideways; inner scrollers keep their own --- */
+.care-app,.care-public{overflow-x:clip}
+
+/* --- Mobile drawer + small-screen refinements (override earlier 760 rules) --- */
+@media(max-width:760px){
+  .care-menu-toggle{display:inline-flex;align-items:center}
+  .care-app{display:block}
+  .care-sidebar{position:fixed;top:0;bottom:0;right:0;left:auto;width:min(84%,300px);height:100svh;z-index:40;transform:translateX(105%);transition:transform .25s ease;box-shadow:-10px 0 34px #153b4226;padding:20px 16px;border:0;border-inline-start:1px solid #e2eaed;display:flex;flex-direction:column;gap:0}
+  .care-sidebar.open{transform:none}
+  .care-sidebar-head{margin-bottom:8px}
+  .care-drawer-close{display:inline-flex}
+  .care-logo{margin:0}
+  .care-sidebar nav{display:grid;gap:7px;overflow:visible;margin-top:14px}
+  .care-sidebar nav a{flex-shrink:1;min-height:48px;font-size:16px;padding:12px}
+  .care-sidebar nav a svg{width:21px}
+  .care-sidebar-bottom{position:static;inset:auto;display:grid;gap:8px;margin-top:auto;padding-top:20px;border-top:1px solid #eef2f3}
+  .care-sidebar-bottom a,.care-sidebar-bottom button{font-size:15px;padding:11px;gap:11px}
+  .care-sidebar-bottom svg{width:18px}
+  .care-top{height:60px;padding:0 16px}
+}
+@media(max-width:480px){
+  .care-metrics{grid-template-columns:1fr 1fr;gap:10px}
+  .care-metric{padding:14px}
+  .care-metric strong{font-size:24px}
+  .care-choice{min-height:auto;padding:22px}
+  .care-choice p{font-size:15px}
+  .care-public-main{padding:22px 16px 44px}
+  .care-heading h1{font-size:25px}
+  .care-radio-group{gap:10px}
+  .care-radio-group label{padding:10px 13px}
+}
+@media(max-width:360px){
+  .care-metrics{grid-template-columns:1fr}
+  .care-public-top{padding:14px 16px}
+  .care-public-admin{padding:8px 12px;font-size:13px}
+}
+
+/* --- Admin ownership: scope tabs + owner badge --- */
+.care-scope-tabs{display:flex;gap:8px;margin-bottom:18px;overflow-x:auto;padding-bottom:4px}
+.care-scope-tabs button{flex-shrink:0;display:inline-flex;align-items:center;gap:8px;border:1px solid #d9e3e6;background:#fff;color:#4a6b71;border-radius:999px;padding:8px 15px;cursor:pointer;font-size:14px;font-weight:500}
+.care-scope-tabs button.active{background:#0a6b60;border-color:#0a6b60;color:#fff}
+.care-scope-tabs button span{background:#0000001a;border-radius:999px;padding:1px 8px;font-size:12px;min-width:20px;text-align:center}
+.care-scope-tabs button.active span{background:#ffffff2e}
+.care-owner{display:inline-flex;align-items:center;gap:6px;margin:12px 0 4px;font-size:14px;border-radius:8px;padding:5px 11px;font-weight:500}
+.care-owner.mine{background:#e6f4f1;color:#0a6b60}
+.care-owner.other{background:#fff3db;color:#8a611c}
+.care-owner.none{background:#eef2f4;color:#6b8086}
+.care-owner strong{font-weight:700}
+.care-report h2{word-break:break-word}
+@media(max-width:760px){.care-scope-tabs button{padding:8px 13px;font-size:13px}}
+
+/* --- Print: hide chrome, show the client report cleanly --- */
+@media print{
+  .care-sidebar,.care-top,.care-footer,.care-public-footer,.care-scrim,.care-filters,.care-scope-tabs,.care-inline{display:none!important}
+  .care-app{display:block}.care-main{padding:0;max-width:none}
+  .care-card,.care-panel{break-inside:avoid;border-color:#ccc}
+}

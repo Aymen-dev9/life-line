@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { requestSchema } from "./validation";
+import { requestSchema, publicRequestSchema } from "./validation";
 
 const base = {
   name: "أحمد علي",
@@ -40,5 +40,23 @@ describe("requestSchema", () => {
     const parsed = requestSchema.parse(base);
     expect(parsed.formattedAddress).toBe("");
     expect(parsed.locationNotes).toBe("");
+  });
+});
+
+describe("publicRequestSchema", () => {
+  it("treats empty client demographics as undefined", () => {
+    const parsed = publicRequestSchema.parse({ ...base, clientGender: "", age: "" });
+    expect(parsed.clientGender).toBeUndefined();
+    expect(parsed.age).toBeUndefined();
+  });
+
+  it("coerces and accepts client gender and age when provided", () => {
+    const parsed = publicRequestSchema.parse({ ...base, clientGender: "female", age: "45" });
+    expect(parsed.clientGender).toBe("female");
+    expect(parsed.age).toBe(45);
+  });
+
+  it("rejects an out-of-range age", () => {
+    expect(() => publicRequestSchema.parse({ ...base, age: "300" })).toThrow();
   });
 });

@@ -1,13 +1,19 @@
 # Life Line
 
-Arabic-first (RTL) home-healthcare platform for Iraq. Patients request home medical
-visits or pharmacy/medicine deliveries — picking their location on an interactive map —
-and an administrator dispatches each request to a provider over WhatsApp and keeps simple
-accounting records. Interface text and branding are editable by the admin.
+Arabic-first (RTL) home-healthcare platform for Iraq. It is a **public service-booking site**
+plus a **private admin operations dashboard**:
+
+- **Clients book without any login/account.** They open the site, choose a service, enter
+  their details, pick their location on a map, optionally attach files, and submit. There is
+  no client login, registration, OTP, password, or session — the flow ends on a confirmation
+  screen showing the request number. Each request is linked to a phone-keyed **client record**
+  (a business record, not an auth account); repeat submissions from the same phone reuse it.
+- **Only admins authenticate**, at `/admin/login` (username + password), and manage requests:
+  approve, take responsibility, assign providers over WhatsApp, and keep accounting records.
 
 - **Frontend:** Next.js 16 (App Router) + React 19 + TypeScript
-- **Backend:** Supabase — PostgreSQL, Auth (Email / WhatsApp OTP), and private Storage
-- **Auth:** Supabase Auth with cookie sessions via `@supabase/ssr`
+- **Backend:** Supabase — PostgreSQL, Auth (admin only), and private Storage
+- **Auth:** Supabase Auth (admins only) with cookie sessions via `@supabase/ssr`
 - **Maps:** Leaflet + OpenStreetMap tiles + Nominatim reverse geocoding (no API key)
 
 The end-user interface is Arabic and RTL. Code identifiers, columns and comments are English.
@@ -17,12 +23,22 @@ The end-user interface is Arabic and RTL. Code identifiers, columns and comments
 - **Every write goes through a `SECURITY DEFINER` Postgres function (RPC)** that enforces
   authorization in the database (`auth.uid()` / `is_admin()`). No table has a direct write
   policy, so the anon/authenticated keys cannot mutate data except through these audited RPCs.
-- **Reads are governed by Row Level Security.** Patients can read only their own requests;
-  providers, payments and other patients' data are admin-only; content is public.
+- **Public booking** goes through `create_public_request()` (granted to `anon`). It finds or
+  creates the client by normalized phone and inserts a `pending` request with `user_id = null`.
+  Public callers can never set protected fields (status, provider, owning admin).
+- **Admin ownership.** Every request is visible to all admins, but has at most one
+  `owner_admin_id` at a time. Claiming/approving are atomic (a race gives exactly one owner);
+  transfers/takeovers are recorded in `admin_ownership_history`, status changes in
+  `request_status_history`.
+- **Reads are governed by Row Level Security.** Clients read nothing directly (they have no
+  session); providers, payments, clients, history and other admin data are admin-only; active
+  services and content are public.
 - **The app never uses the Supabase service-role key.** The browser-safe publishable key
   plus RLS/RPCs are sufficient. Keep the secret key out of the app.
-- **Prescription images** live in a private Storage bucket (`prescriptions`), streamed back
-  through an authenticated route — never via public URLs.
+- **Attachments** live in a private Storage bucket (`prescriptions`). Public uploads land
+  under a `public/` prefix; images are streamed back only to admins — never via public URLs.
+- **WhatsApp** notifications use a mock-first `NotificationService`; a failure is logged with
+  status `FAILED` and never blocks approve/assign.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detail and [docs/MVP-PLAN-AR.md](docs/MVP-PLAN-AR.md)
 for the Arabic product plan.
@@ -54,40 +70,47 @@ The app does **not** use a service-role key. See [.env.example](.env.example).
 ## Database & migrations
 
 SQL migrations live in [`supabase/migrations/`](supabase/migrations) and are the source of
-truth for the schema, functions, RLS policies and Storage bucket:
+truth for the schema, functions, RLS policies and Storage bucket. **Apply them in filename
+order** with the [Supabase CLI](https://supabase.com/docs/guides/local-development)
+(`supabase db push`) or by pasting them into the SQL editor in order. Every migration is
+additive — no drops of tables/data, no reset.
 
 1. `..._core_schema.sql` — tables, indexes, RLS enabled, seed services.
-2. `..._functions.sql` — `is_admin`, profile/role sync, and all mutation RPCs.
+2. `..._functions.sql` — `is_admin`, profile/role sync, and the original mutation RPCs.
 3. `..._policies_storage.sql` — RLS read policies + the private `prescriptions` bucket.
+4. `..._harden.sql` — locks down the trigger function's execute grant.
+5. `..._admin_allowlist.sql` — comma-separated admin email allowlist.
+6. `20260915120000_public_booking.sql` — `clients` table; `requests.client_id` /
+   `owner_admin_id`; `user_id` made nullable; extended status set (`approved`/`cancelled`);
+   `normalize_phone()`; **`create_public_request()` (anon)**; anon `public/` storage upload policy.
+7. `20260915120100_admin_accounts.sql` — five admin Supabase Auth users (bcrypt) + allowlist.
+8. `20260915120200_ownership.sql` — `request_status_history`, `admin_ownership_history`;
+   profile `username`/`admin_active`/`last_login_at`; atomic `claim`/`approve`/`reject`/
+   `transfer` RPCs; `request_history()`; `get_workspace()` extended with the admin roster.
+9. `20260915120300_operations.sql` — `notifications`; `record_notification`, `search_clients`,
+   `client_report`, `get_admins`, `export_backup`.
 
-Apply them with the [Supabase CLI](https://supabase.com/docs/guides/local-development)
-(`supabase db push`) or paste them into the SQL editor in order.
-
-Core tables: `profiles`, `services`, `providers`, `requests` (includes `latitude`,
-`longitude`, `formatted_address`, `location_notes`), `payments`, `content`, `app_config`,
+Core tables: `profiles`, `clients`, `services`, `providers`, `requests`, `payments`,
+`notifications`, `request_status_history`, `admin_ownership_history`, `content`, `app_config`,
 `rate_limits`, `audit_log`.
 
-## Authentication & admin bootstrap
+## Authentication (admins only)
 
-- Login is passwordless **Email OTP** (primary) or **WhatsApp OTP** (requires a configured
-  provider — see below). The UI asks for a 6-digit code.
-- For the emailed 6-digit code to appear, the Supabase **Auth → Email Templates → Magic Link**
-  template must include `{{ .Token }}` (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)).
-- **The first admin is set in the database**, not from the browser:
+Clients never authenticate. Admins sign in at **`/admin/login`** with a **username + password**.
+The username maps to a fixed `<username>@lifeline.local` email and is verified against Supabase
+Auth; a non-admin credential is rejected and its session torn down immediately.
+
+- **Five admin accounts** are seeded by `20260915120100_admin_accounts.sql`: usernames
+  `admin1`…`admin5`, dev passwords `LifeLine#Admin1`…`LifeLine#Admin5` (bcrypt-hashed — **rotate
+  in production**; each admin changes their own password under *Admin Users*). If your Supabase/
+  GoTrue version rejects the `auth.users` seed, create the five users from the dashboard
+  (Authentication → Users) with the same emails; the allowlist grants them admin on first login.
+- The admin allowlist is `app_config.admin_email` (comma-separated); add the owner's own email
+  there too if desired. Role assignment is decided server-side from the verified JWT email.
 
   ```sql
-  update public.app_config set value = 'admin@example.com' where key = 'admin_email';
+  update public.app_config set value = value || ',owner@example.com' where key = 'admin_email';
   ```
-
-  Any account that verifies with that exact email becomes an admin (checked server-side
-  against the verified JWT). Everyone else is a patient.
-
-### WhatsApp OTP
-
-The UI supports WhatsApp login, but Supabase phone/WhatsApp auth needs an external SMS/
-WhatsApp provider configured in the Supabase dashboard (Auth → Providers → Phone). Until
-that is configured, use **Email OTP**, which works out of the box. WhatsApp login never
-fakes a code — if no provider is configured the send simply fails cleanly.
 
 ## Location / map behaviour
 

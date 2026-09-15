@@ -2,21 +2,23 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { HeartPulse, Home, Stethoscope, Pill, ClipboardList, UserRound, LayoutDashboard, UsersRound, Settings2, Type, Wallet, LogOut, ArrowLeft, CheckCircle2, Clock3 } from "lucide-react";
+import { HeartPulse, Home, Stethoscope, Pill, ClipboardList, UserRound, LayoutDashboard, UsersRound, Settings2, Type, Wallet, LogOut, ArrowLeft, CheckCircle2, Clock3, Menu, X, Contact, ShieldCheck, Database } from "lucide-react";
 import type { ContentKey } from "./content";
 import type { WorkspaceData, RequestRecord } from "./types";
 import { useContent } from "./content-provider";
 import { api, dateLabel, errorKey } from "./client";
 import { RequestForm, ProfileForm } from "./request-form";
 import { AdminRequests, CatalogEditor, Accounting } from "./admin-panels";
+import { ClientsPanel, AdminUsersPanel, BackupPanel } from "./ops-panels";
 import { ContentEditor } from "./text-editor";
+import { SiteFooter } from "./footer";
 
 export type Mutate = (body: object) => Promise<boolean>;
 const patientLinks = [
   ["home", "/", "nav.home", Home], ["medical", "/services/request", "nav.medical", Stethoscope], ["pharmacy", "/pharmacy/request", "nav.pharmacy", Pill], ["requests", "/requests", "nav.requests", ClipboardList], ["profile", "/profile", "nav.profile", UserRound],
 ] as const;
 const adminLinks = [
-  ["admin", "/admin", "nav.admin", LayoutDashboard], ["providers", "/admin/providers", "nav.providers", UsersRound], ["services", "/admin/services", "nav.services", Settings2], ["content", "/admin/content", "nav.content", Type], ["accounting", "/admin/accounting", "nav.accounting", Wallet],
+  ["admin", "/admin", "nav.admin", LayoutDashboard], ["clients", "/admin/clients", "nav.clients", Contact], ["providers", "/admin/providers", "nav.providers", UsersRound], ["services", "/admin/services", "nav.services", Settings2], ["accounting", "/admin/accounting", "nav.accounting", Wallet], ["admins", "/admin/admins", "nav.admins", ShieldCheck], ["content", "/admin/content", "nav.content", Type], ["backup", "/admin/backup", "nav.backup", Database],
 ] as const;
 
 export function Workspace({ initial, section }: { initial: WorkspaceData; section: string }) {
@@ -24,6 +26,7 @@ export function Workspace({ initial, section }: { initial: WorkspaceData; sectio
   const [data, setData] = useState(initial);
   const [message, setMessage] = useState<ContentKey | null>(null);
   const [busy, setBusy] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const isAdminPage = adminLinks.some(link => link[0] === section);
   async function mutate(body: object) {
     if (busy) return false;
@@ -33,16 +36,17 @@ export function Workspace({ initial, section }: { initial: WorkspaceData; sectio
     finally { setBusy(false); }
   }
   async function logout() {
-    try { await api("/api/care/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "logout" }) }); window.location.assign("/login"); }
+    try { await api("/api/care/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "logout" }) }); window.location.assign("/admin/login"); }
     catch (error) { setMessage(errorKey(error)); }
   }
   return <div className="care-app" dir="rtl" lang="ar">
-    <aside className="care-sidebar">
-      <Link className="care-logo" href={isAdminPage ? "/admin" : "/"}><span><HeartPulse /></span><div><strong>{c("brand.name")}</strong><small>{c("brand.tagline")}</small></div></Link>
-      <nav aria-label={c(isAdminPage ? "nav.admin" : "nav.home")}>{(isAdminPage ? adminLinks : patientLinks).map(([key, href, label, Icon]) => <Link key={key} href={href} className={section === key ? "selected" : ""} aria-current={section === key ? "page" : undefined}><Icon size={21} /><span>{c(label)}</span></Link>)}</nav>
-      <div className="care-sidebar-bottom">{data.user.role === "admin" && <Link href={isAdminPage ? "/" : "/admin"}><LayoutDashboard size={18} />{c(isAdminPage ? "nav.patient" : "nav.admin")}</Link>}<button onClick={() => void logout()}><LogOut size={18} />{c("nav.logout")}</button></div>
+    {menuOpen && <div className="care-scrim" onClick={() => setMenuOpen(false)} aria-hidden="true" />}
+    <aside className={`care-sidebar${menuOpen ? " open" : ""}`}>
+      <div className="care-sidebar-head"><Link className="care-logo" href={isAdminPage ? "/admin" : "/"} onClick={() => setMenuOpen(false)}><span><HeartPulse /></span><div><strong>{c("brand.name")}</strong><small>{c("brand.tagline")}</small></div></Link><button className="care-drawer-close" onClick={() => setMenuOpen(false)} aria-label={c("common.cancel")}><X size={22} /></button></div>
+      <nav aria-label={c(isAdminPage ? "nav.admin" : "nav.home")}>{(isAdminPage ? adminLinks : patientLinks).map(([key, href, label, Icon]) => <Link key={key} href={href} onClick={() => setMenuOpen(false)} className={section === key ? "selected" : ""} aria-current={section === key ? "page" : undefined}><Icon size={21} /><span>{c(label)}</span></Link>)}</nav>
+      <div className="care-sidebar-bottom">{data.user.role === "admin" && <Link href={isAdminPage ? "/" : "/admin"} onClick={() => setMenuOpen(false)}><LayoutDashboard size={18} />{c(isAdminPage ? "nav.patient" : "nav.admin")}</Link>}<button onClick={() => void logout()}><LogOut size={18} />{c("nav.logout")}</button></div>
     </aside>
-    <div className="care-main-column"><header className="care-top"><span>{c(isAdminPage ? "nav.admin" : "brand.tagline")}</span><div className="care-user"><span>{data.user.name || c(isAdminPage ? "nav.admin" : "nav.profile")}</span><span className="care-avatar"><UserRound size={19} /></span></div></header>
+    <div className="care-main-column"><header className="care-top"><div className="care-top-start"><button className="care-menu-toggle" onClick={() => setMenuOpen(true)} aria-label={c("nav.admin")}><Menu size={22} /></button><span>{c(isAdminPage ? "nav.admin" : "brand.tagline")}</span></div><div className="care-user"><span>{data.user.name || c(isAdminPage ? "nav.admin" : "nav.profile")}</span><span className="care-avatar"><UserRound size={19} /></span></div></header>
       {data.user.demo && <div className="care-demo-banner">{c("demo.notice")}</div>}
       <main className="care-main" key={section}>
         {message && <div role="status" className={`care-alert ${message.startsWith("error.") ? "error" : ""}`}>{c(message)}</div>}
@@ -52,9 +56,12 @@ export function Workspace({ initial, section }: { initial: WorkspaceData; sectio
         {section === "requests" && <><PageHeading title="requests.title" description="requests.description" /><RequestList requests={data.requests} /></>}
         {section === "admin" && <AdminRequests data={data} mutate={mutate} busy={busy} />}
         {(section === "providers" || section === "services") && <CatalogEditor kind={section} data={data} mutate={mutate} busy={busy} />}
+        {section === "clients" && <ClientsPanel />}
+        {section === "admins" && <AdminUsersPanel />}
+        {section === "backup" && <BackupPanel />}
         {section === "content" && <ContentEditor />}
         {section === "accounting" && <Accounting data={data} />}
-      </main><footer className="care-footer">{c("brand.name")} · {c("brand.footer")}</footer>
+      </main><SiteFooter className="care-footer" />
     </div>
   </div>;
 }

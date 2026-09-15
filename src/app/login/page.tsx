@@ -1,8 +1,3 @@
-import type { Metadata } from "next";
-import { Login } from "@/care/login";
-
-export const metadata: Metadata = { title: "تسجيل الدخول", description: "الدخول إلى منصة الخدمات الطبية المنزلية" };
-
-export default function LoginPage() {
-  return <Login />;
-}
+import { redirect } from "next/navigation";
+// Legacy client login route — clients no longer authenticate. Send stragglers to admin login.
+export default function LoginPage() { redirect("/admin/login"); }

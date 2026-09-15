@@ -1,2 +1,2 @@
-import { CarePage } from "@/care/page-server";
-export default function Page() { return <CarePage section="home" />; }
+import { PublicHome } from "@/care/public";
+export default function Page() { return <PublicHome />; }

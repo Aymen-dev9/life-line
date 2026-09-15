@@ -4,16 +4,25 @@ import { CareError, rpcError, supabaseAnon, supabaseServer } from "@/care/server
 
 export const runtime = "nodejs";
 
+// Admin-only authentication. Clients never authenticate — booking is public. Admins sign in
+// with a username (mapped to a fixed <username>@lifeline.local email) and password against
+// Supabase Auth; a non-admin credential is rejected and its session torn down immediately.
+const ADMIN_EMAIL_DOMAIN = "lifeline.local";
+
 const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("logout") }),
-  z.object({ action: z.literal("password"), email: z.string().trim().max(254), password: z.string().min(1).max(200) }),
   z.object({
-    action: z.enum(["send", "verify"]),
-    channel: z.enum(["email", "whatsapp"]),
-    identifier: z.string().trim().max(254),
-    token: z.string().regex(/^\d{6,10}$/).optional(),
+    action: z.literal("admin"),
+    username: z.string().trim().min(1).max(254),
+    password: z.string().min(1).max(200),
   }),
+  z.object({ action: z.literal("changePassword"), password: z.string().min(8).max(200) }),
 ]);
+
+function usernameToEmail(username: string): string {
+  const value = username.trim().toLowerCase();
+  return value.includes("@") ? value : `${value}@${ADMIN_EMAIL_DOMAIN}`;
+}
 
 async function rateLimit(key: string, max: number, seconds: number) {
   const { error } = await supabaseAnon().rpc("rate_limit", { p_key: key, p_max: max, p_seconds: seconds });
@@ -31,47 +40,34 @@ export async function POST(request: Request) {
       return json({ ok: true });
     }
 
-    // Email + password sign-in (fixed test accounts on the free plan). OTP stays intact.
-    if (body.action === "password") {
-      const email = z.email().parse(body.email).toLowerCase();
-      await rateLimit(`auth:password:${email}`, 10, 600);
-      await rateLimit("auth-global:password", 300, 600);
+    // Admin changes their own password (must be a signed-in admin).
+    if (body.action === "changePassword") {
       const supabase = await supabaseServer();
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password: body.password });
-      if (error || !data.user || !data.session) throw new CareError("CREDENTIALS", 401);
-      const { data: profile, error: syncError } = await supabase.rpc("sync_profile");
-      if (syncError) throw rpcError(syncError);
-      const role = (profile as { role?: string } | null)?.role === "admin" ? "admin" : "patient";
-      return json({ redirect: role === "admin" ? "/admin" : "/" });
-    }
-
-    const identifier = body.channel === "email"
-      ? z.email().parse(body.identifier).toLowerCase()
-      : z.string().regex(/^\+[1-9]\d{7,14}$/).parse(body.identifier);
-    await rateLimit(`auth:${body.action}:${body.channel}:${identifier}`, body.action === "send" ? 3 : 8, 600);
-    await rateLimit(`auth-global:${body.action}`, body.action === "send" ? 100 : 300, 600);
-
-    if (body.action === "send") {
-      const supabase = supabaseAnon();
-      const { error } = body.channel === "email"
-        ? await supabase.auth.signInWithOtp({ email: identifier })
-        : await supabase.auth.signInWithOtp({ phone: identifier, options: { channel: "whatsapp" } });
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new CareError("UNAUTHORIZED", 401);
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+      if (profile?.role !== "admin") throw new CareError("FORBIDDEN", 403);
+      const { error } = await supabase.auth.updateUser({ password: body.password });
       if (error) throw new CareError("UNAVAILABLE", 503);
-      return json({ sent: true });
+      return json({ ok: true });
     }
 
-    if (!body.token) throw new CareError("INVALID", 422);
-    // Cookie-bound client so a successful verification persists the session.
-    const supabase = await supabaseServer();
-    const { data, error } = body.channel === "email"
-      ? await supabase.auth.verifyOtp({ email: identifier, token: body.token, type: "email" })
-      : await supabase.auth.verifyOtp({ phone: identifier, token: body.token, type: "sms" });
-    if (error || !data.user || !data.session) throw new CareError("OTP", 401);
+    // Admin sign-in.
+    const email = usernameToEmail(body.username);
+    await rateLimit(`auth:admin:${email}`, 10, 600);
+    await rateLimit("auth-global:admin", 300, 600);
 
-    // Ensure the profile exists and re-derive the admin role from the verified email.
+    const supabase = await supabaseServer();
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password: body.password });
+    if (error || !data.user || !data.session) throw new CareError("CREDENTIALS", 401);
+
+    // Re-derive the role from the verified email allowlist. Reject (and sign out) non-admins.
     const { data: profile, error: syncError } = await supabase.rpc("sync_profile");
     if (syncError) throw rpcError(syncError);
-    const role = (profile as { role?: string } | null)?.role === "admin" ? "admin" : "patient";
-    return json({ redirect: role === "admin" ? "/admin" : "/" });
+    if ((profile as { role?: string } | null)?.role !== "admin") {
+      await supabase.auth.signOut();
+      throw new CareError("FORBIDDEN", 403);
+    }
+    return json({ redirect: "/admin" });
   } catch (error) { return errorResponse(error); }
 }

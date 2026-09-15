@@ -1,2 +1,3 @@
-import { CarePage } from "@/care/page-server";
-export default function Page() { return <CarePage section="profile" />; }
+import { redirect } from "next/navigation";
+// Clients have no account/profile in the public model.
+export default function Page() { redirect("/"); }

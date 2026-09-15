@@ -19,3 +19,13 @@ export const requestSchema = z.object({
 });
 
 export type RequestInput = z.infer<typeof requestSchema>;
+
+// Public (unauthenticated) booking adds optional care-recipient demographics. The phone is
+// normalized server-side before validation, so the strict international shape still holds.
+const emptyToUndefined = (value: unknown) => (value === "" || value == null ? undefined : value);
+export const publicRequestSchema = requestSchema.extend({
+  clientGender: z.preprocess(emptyToUndefined, z.enum(["male", "female"]).optional()),
+  age: z.preprocess(emptyToUndefined, z.coerce.number().int().min(0).max(150).optional()),
+});
+
+export type PublicRequestInput = z.infer<typeof publicRequestSchema>;
